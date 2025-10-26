@@ -16,4 +16,7 @@ O menu principal oferece as seguintes opções:
 
     Sair: Fecha o programa.
 
+Feito pelos alunos Lissa Guirau Kawasaki e Theo Okagawa Rodrigues, alunos do bacharelado de Ciência da Computação na Universidade Estadual do Paraná.
+
+© 2017 nagano / chiikawa
 
