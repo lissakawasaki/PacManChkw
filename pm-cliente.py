@@ -73,7 +73,6 @@ def info():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 info_running = False
-                running = False
 
         screen.fill((255, 250, 231))
         screen.blit(background, (0, 0))
@@ -88,7 +87,6 @@ def info():
 
 def ajuda():
 
-    global running
     pygame.display.set_caption("Ajuda")
     
     ajuda_running = True 
@@ -108,7 +106,6 @@ def ajuda():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 ajuda_running = False
-                running = False
 
         screen.fill((255, 250, 231))
         screen.blit(background, (0, 0))
@@ -122,11 +119,12 @@ def ajuda():
         screen.blit(texto_s2, (300, 440))
         
         if bot_voltar.draw(screen) == True:
-            pygame.event.clear()
-            pygame.time.delay(100)
+            pygame.time.delay(150)
             ajuda_running = False
 
         pygame.display.update()
+
+    pygame.event.clear()
 
 if __name__ == '__main__':
     menu_principal() 
