@@ -1,4 +1,5 @@
 import pygame, sys
+from pygame import mixer
 from button import Button
 
 pygame.init()
@@ -10,6 +11,9 @@ running = True
 fonte = pygame.font.Font('sprites/upheavtt.ttf', 25) 
 background = pygame.image.load("sprites/bg.png").convert() 
 icon_image = pygame.image.load('sprites/icone.webp').convert_alpha()
+mixer.music.load("assets/BGM.mp3")
+mixer.music.play(-1)
+pygame.mixer.music.set_volume(0.2)
 
 pygame.display.set_icon(icon_image)
 
@@ -22,6 +26,8 @@ def menu_principal():
     info_img = pygame.image.load('sprites/bot_info.png').convert_alpha()
     sair_img = pygame.image.load('sprites/bot_sair.png').convert_alpha()
     ajuda_img = pygame.image.load('sprites/bot_ajuda.png').convert_alpha()
+
+    ura_sfx = pygame.mixer.Sound("assets/usagi-prr.mp3")
 
     bot_jogar = Button(145, 200, jogar_img)
     bot_ajuda = Button(145, 300, ajuda_img)
@@ -48,13 +54,17 @@ def menu_principal():
         bot_sair = Button(145, 500, sair_img)
 
         if bot_jogar.draw(screen) == True:
+            ura_sfx.play()
             play()
         if bot_ajuda.draw(screen) == True:
+            ura_sfx.play()
             ajuda()
         if bot_info.draw(screen) == True:
+            ura_sfx.play()
             info()
             pygame.event.clear()
         if bot_sair.draw(screen) == True:
+            ura_sfx.play()
             running = False
     
         pygame.display.update()
