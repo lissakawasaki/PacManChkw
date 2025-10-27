@@ -59,6 +59,8 @@ def menu_principal():
     
         pygame.display.update()
 
+# def jogar():  # conecta ao servidor, faz o loop do jogo 
+
 def info():
 
     pygame.display.set_caption("Informações")
@@ -76,7 +78,7 @@ def info():
 
         screen.fill((255, 250, 231))
         screen.blit(background, (0, 0))
-        screen.blit(texto_info, (0, 0))
+        screen.blit(texto_info, (0, -40))
 
         if bot_voltar.draw(screen) == True:
             pygame.event.clear()
