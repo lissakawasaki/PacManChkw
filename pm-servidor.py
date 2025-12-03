@@ -1,395 +1,392 @@
 import socket
-import threading
 import json
-from time import sleep, time
-from random import choice
+import time
+import random
+import threading
+import pygame
+import math
 
-# --- CONFIGURAÇÕES ---
 HOST = "127.0.0.1"
 PORT = 65432
-GRID_WIDTH = 30
-GRID_HEIGHT = 33 # Ajustado para o tamanho real do seu array boards
 TILE_SIZE = 32
-PACMAN_SPEED = 4
-GHOST_SPEED = 2
+GRID_WIDTH = 20
+GRID_HEIGHT = 20
+FPS = 60 
 
-# Mapa do Jogo (Copiado do seu código)
-boards = [
-    [6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5],
-    [3,6,4,4,4,4,4,4,4,4,4,4,4,4,5,6,4,4,4,4,4,4,4,4,4,4,4,4,5,3],
-    [3,3,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,1,1,1,1,1,1,1,1,3,3],
-    [3,3,1,6,4,4,5,1,6,4,4,4,5,1,3,3,1,6,4,4,4,5,1,6,4,4,5,1,3,3],
-    [3,3,2,3,0,0,3,1,3,0,0,0,3,1,3,3,1,3,0,0,0,3,1,3,0,0,3,2,3,3],
-    [3,3,1,7,4,4,8,1,7,4,4,4,8,1,7,8,1,7,4,4,4,8,1,7,4,4,8,1,3,3],
-    [3,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3],
-    [3,3,1,6,4,4,5,1,6,5,1,6,4,4,4,4,4,4,5,1,6,5,1,6,4,4,5,1,3,3],
-    [3,3,1,7,4,4,8,1,3,3,1,7,4,4,5,6,4,4,8,1,3,3,1,7,4,4,8,1,3,3],
-    [3,3,1,1,1,1,1,1,3,3,1,1,1,1,3,3,1,1,1,1,3,3,1,1,1,1,1,1,3,3],
-    [3,7,4,4,4,4,5,1,3,7,4,4,5,0,3,3,0,6,4,4,8,3,1,6,4,4,4,4,8,3],
-    [3,0,0,0,0,0,3,1,3,6,4,4,8,0,7,8,0,7,4,4,5,3,1,3,0,0,0,0,0,3],
-    [3,0,0,0,0,0,3,1,3,3,0,0,0,0,0,0,0,0,0,0,3,3,1,3,0,0,0,0,0,3],
-    [8,0,0,0,0,0,3,1,3,3,0,6,4,4,9,9,4,4,5,0,3,3,1,3,0,0,0,0,0,7], # Linha 13 (Gate 9,9)
-    [4,4,4,4,4,4,8,1,7,8,0,3,0,0,0,0,0,0,3,0,7,8,1,7,4,4,4,4,4,4],
-    [0,0,0,0,0,0,0,1,0,0,0,3,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0],
-    [4,4,4,4,4,4,5,1,6,5,0,3,0,0,0,0,0,0,3,0,6,5,1,6,4,4,4,4,4,4],
-    [5,0,0,0,0,0,3,1,3,3,0,7,4,4,4,4,4,4,8,0,3,3,1,3,0,0,0,0,0,6],
-    [3,0,0,0,0,0,3,1,3,3,0,0,0,0,0,0,0,0,0,0,3,3,1,3,0,0,0,0,0,3],
-    [3,0,0,0,0,0,3,1,3,3,0,6,4,4,4,4,4,4,5,0,3,3,1,3,0,0,0,0,0,3],
-    [3,6,4,4,4,4,8,1,7,8,0,7,4,4,5,6,4,4,8,0,7,8,1,7,4,4,4,4,5,3],
-    [3,3,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,1,1,1,1,1,1,1,1,3,3], # Linha 21 (Safe row)
-    [3,3,1,6,4,4,5,1,6,4,4,4,5,1,3,3,1,6,4,4,4,5,1,6,4,4,5,1,3,3],
-    [3,3,1,7,4,5,3,1,7,4,4,4,8,1,7,8,1,7,4,4,4,8,1,3,6,4,8,1,3,3],
-    [3,3,2,1,1,3,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,2,3,3],
-    [3,7,4,5,1,3,3,1,6,5,1,6,4,4,4,4,4,4,5,1,6,5,1,3,3,1,6,4,8,3],
-    [3,6,4,8,1,7,8,1,3,3,1,7,4,4,5,6,4,4,8,1,3,3,1,7,8,1,7,4,5,3],
-    [3,3,1,1,1,1,1,1,3,3,1,1,1,1,3,3,1,1,1,1,3,3,1,1,1,1,1,1,3,3],
-    [3,3,1,6,4,4,4,4,8,7,4,4,5,1,3,3,1,6,4,4,8,7,4,4,4,4,5,1,3,3],
-    [3,3,1,7,4,4,4,4,4,4,4,4,8,1,7,8,1,7,4,4,4,4,4,4,4,4,8,1,3,3],
-    [3,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3],
-    [3,7,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,8,3],
-    [7,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,8]
-]
+WALL = 1
+PELLET = 0
+POWER_UP = 2
+EMPTY = 9
 
-MAP_LAYOUT = boards
-state_lock = threading.Lock()
-
-class Game:
+class GameServer:
     def __init__(self):
-        self.GHOST_NAMES = {
-            'f1': {'name': 'Momonga', 'type': 'Blinky'},
-            'f2': {'name': 'Shisa', 'type': 'Inky'},
-            'f3': {'name': 'Hachiware', 'type': 'Pinky'},
-            'f4': {'name': 'Chiikawa', 'type': 'Clyde'}
-        }
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((HOST, PORT))
+        self.server_socket.listen()
+        self.clients = []
+        self.running = True
+        
+        self.mode_timer = 0
+        self.current_mode = 'scatter' 
+        self.last_mode_switch = time.time()
+        
         self.reset_game()
-        self.player_connected = False
-        self.client_movement_queue = None
+
+    def generate_map(self):
+        layout = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 2, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 2, 1],
+            [1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 0, 1, 1, 1, 9, 1, 1, 9, 1, 1, 1, 0, 1, 1, 1, 1],
+            [1, 1, 1, 1, 0, 1, 9, 9, 9, 9, 9, 9, 9, 9, 1, 0, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 9, 1, 1, 9, 9, 1, 1, 9, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 9, 1, 9, 9, 9, 9, 1, 9, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 0, 1, 9, 1, 1, 1, 1, 1, 1, 9, 1, 0, 1, 1, 1, 1],
+            [1, 1, 1, 1, 0, 1, 9, 9, 9, 9, 9, 9, 9, 9, 1, 0, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+            [1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1],
+            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 2, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 2, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ]
+        return layout
 
     def reset_game(self):
-        self.map = [row[:] for row in MAP_LAYOUT]
-        # Posição Segura para Pacman (Col 2, Row 2) - Baseado no seu mapa
-        self.pacman = {'x': 2 * TILE_SIZE, 'y': 2 * TILE_SIZE, 'direction': 'RIGHT', 'score': 0, 'power_up_timer': 0}
+        self.game_map = self.generate_map()
+        self.status = 'waiting_for_players'
+        self.last_mode_switch = time.time()
+        self.current_mode = 'scatter'
         
-        # Posições Seguras para Fantasmas (Dentro da casa e logo acima)
-        self.ghosts = [
-            {'id': 'f1', 'x': 14 * TILE_SIZE, 'y': 11 * TILE_SIZE, 'state': 'normal', 'dir': 'LEFT'},  # Fora
-            {'id': 'f2', 'x': 15 * TILE_SIZE, 'y': 11 * TILE_SIZE, 'state': 'normal', 'dir': 'RIGHT'}, # Fora
-            {'id': 'f3', 'x': 14 * TILE_SIZE, 'y': 14 * TILE_SIZE, 'state': 'normal', 'dir': 'UP'},    # Dentro
-            {'id': 'f4', 'x': 15 * TILE_SIZE, 'y': 14 * TILE_SIZE, 'state': 'normal', 'dir': 'UP'},    # Dentro
-        ]
-        self.game_status = 'waiting_for_players'
-        self.dots_remaining = sum(r.count(1) + r.count(2) for r in self.map)
-        self.mode = 'scatter'
-        self.mode_timer = time()
-        self.scatter_duration = 7
-        self.chase_duration = 20
-
-    def serializer(self):
-        return {
-            'map': self.map,
-            'pacman': self.pacman,
-            'ghosts': self.ghosts,
-            'status': self.game_status,
-            'names': self.GHOST_NAMES
+        self.pacman = {
+            'x': TILE_SIZE * 10,
+            'y': TILE_SIZE * 15,
+            'direction': 'RIGHT',
+            'next_direction': 'RIGHT',
+            'score': 0,
+            'power_up_timer': 0,
+            'speed': 4
         }
 
-    def to_grid(self, pixel_coord):
-        return int(pixel_coord // TILE_SIZE)
+        self.ghosts = [
+            {'id': 'f1', 'x': 10 * TILE_SIZE, 'y': 8 * TILE_SIZE, 'direction': 'LEFT', 'state': 'normal', 'speed': 2, 'scatter_target': (GRID_WIDTH-2, 1)}, 
+            {'id': 'f2', 'x': 10 * TILE_SIZE, 'y': 10 * TILE_SIZE, 'direction': 'UP', 'state': 'normal', 'speed': 2, 'scatter_target': (1, 1)},
+            {'id': 'f3', 'x': 9 * TILE_SIZE, 'y': 10 * TILE_SIZE, 'direction': 'UP', 'state': 'normal', 'speed': 2, 'scatter_target': (GRID_WIDTH-2, GRID_HEIGHT-2)},
+            {'id': 'f4', 'x': 11 * TILE_SIZE, 'y': 10 * TILE_SIZE, 'direction': 'UP', 'state': 'normal', 'speed': 2, 'scatter_target': (1, GRID_HEIGHT-2)},
+        ]
 
-    def get_tile_type(self, x, y):
-        grid_x = x // TILE_SIZE
-        grid_y = y // TILE_SIZE
-        if 0 <= grid_y < len(self.map) and 0 <= grid_x < len(self.map[0]):
-            return self.map[grid_y][grid_x]
-        return 3 # Parede se fora
+    def get_state(self):
+        return {
+            'status': self.status,
+            'map': self.game_map,
+            'pacman': self.pacman,
+            'ghosts': self.ghosts
+        }
 
-    def is_collision(self, x, y, is_ghost=False):
-        # Verifica colisão no centro do sprite para evitar prender na parede
-        center_x = x + TILE_SIZE // 2
-        center_y = y + TILE_SIZE // 2
-        t = self.get_tile_type(center_x, center_y)
+    def is_wall(self, grid_x, grid_y):
+        if 0 <= grid_y < GRID_HEIGHT and 0 <= grid_x < GRID_WIDTH:
+            return self.game_map[grid_y][grid_x] == WALL
+        return True
+
+    def can_move(self, x, y, direction, speed):
+        new_x, new_y = x, y
+        if direction == 'UP': new_y -= speed
+        elif direction == 'DOWN': new_y += speed
+        elif direction == 'LEFT': new_x -= speed
+        elif direction == 'RIGHT': new_x += speed
+
+        rect = pygame.Rect(new_x, new_y, TILE_SIZE, TILE_SIZE)
         
-        # 0=Vazio, 1=Ponto, 2=Power, 9=Portão (só fantasma passa)
-        walkable_pacman = (0, 1, 2)
-        walkable_ghost = (0, 1, 2, 9)
+        def get_tile(px, py):
+            tx = int(px // TILE_SIZE)
+            ty = int(py // TILE_SIZE)
+            if 0 <= ty < GRID_HEIGHT and 0 <= tx < GRID_WIDTH:
+                return self.game_map[ty][tx]
+            return 1
 
-        if is_ghost:
-            return t not in walkable_ghost
-        else:
-            return t not in walkable_pacman
+        margin = 2
+        tl = get_tile(rect.left + margin, rect.top + margin)
+        tr = get_tile(rect.right - margin, rect.top + margin)
+        bl = get_tile(rect.left + margin, rect.bottom - margin)
+        br = get_tile(rect.right - margin, rect.bottom - margin)
 
-    def manhattan_distance(self, x1, y1, x2, y2):
-        return abs(self.to_grid(x1) - self.to_grid(x2)) + abs(self.to_grid(y1) - self.to_grid(y2))
-
-    def get_next_pacman_pos(self, x, y, direction):
-        tx, ty = x, y
-        s = PACMAN_SPEED
-        if direction == 'UP': ty -= s
-        elif direction == 'DOWN': ty += s
-        elif direction == 'LEFT': tx -= s
-        elif direction == 'RIGHT': tx += s
-        return tx, ty
-
-    def update_pacman(self, new_direction):
-        pacman = self.pacman
-        nx, ny = self.get_next_pacman_pos(pacman['x'], pacman['y'], new_direction)
+        if tl == 1 or tr == 1 or bl == 1 or br == 1:
+            return False, x, y
         
-        # Tenta mudar de direção
-        if new_direction != pacman['direction'] and not self.is_collision(nx, ny):
-            pacman['x'], pacman['y'] = nx, ny
-            pacman['direction'] = new_direction
-        else:
-            # Continua na direção atual se possível
-            cx, cy = self.get_next_pacman_pos(pacman['x'], pacman['y'], pacman['direction'])
-            if not self.is_collision(cx, cy):
-                pacman['x'], pacman['y'] = cx, cy
+        return True, new_x, new_y
 
-        # Coleta de Itens
-        grid_x = self.to_grid(pacman['x'] + TILE_SIZE // 2)
-        grid_y = self.to_grid(pacman['y'] + TILE_SIZE // 2)
+    def get_target_tile(self, ghost):
+        pac_gx = int(self.pacman['x'] // TILE_SIZE)
+        pac_gy = int(self.pacman['y'] // TILE_SIZE)
+        pac_dir = self.pacman['direction']
         
-        if 0 <= grid_y < len(self.map) and 0 <= grid_x < len(self.map[0]):
-            tile_value = self.map[grid_y][grid_x]
-            if tile_value == 1:
-                pacman['score'] += 10
-                self.map[grid_y][grid_x] = 0
-                self.dots_remaining -= 1
-            elif tile_value == 2:
-                pacman['score'] += 50
-                self.map[grid_y][grid_x] = 0
-                self.dots_remaining -= 1
-                pacman['power_up_timer'] = 600
-                self.activate_power_up()
+        if self.current_mode == 'scatter':
+            return ghost['scatter_target']
 
-        if pacman['power_up_timer'] > 0:
-            pacman['power_up_timer'] -= 1
-            if pacman['power_up_timer'] == 0:
-                self.deactivate_power_up()
+        if ghost['id'] == 'f1':
+            return (pac_gx, pac_gy)
 
-    def get_ghost_target(self, ghost_type, ghost_x, ghost_y, pacman_grid_x, pacman_grid_y, pacman_dir):
-        # Lógica simplificada de alvo
-        if self.mode == 'scatter':
-            if ghost_type == 'Blinky': return GRID_WIDTH - 2, 1
-            if ghost_type == 'Pinky': return 1, 1
-            if ghost_type == 'Inky': return GRID_WIDTH - 2, GRID_HEIGHT - 2
-            return 1, GRID_HEIGHT - 2 # Clyde
-        
-        # Chase Mode
-        if ghost_type == 'Blinky':
-            return pacman_grid_x, pacman_grid_y
-        
-        if ghost_type == 'Pinky': # 4 à frente
-            tx, ty = pacman_grid_x, pacman_grid_y
-            if pacman_dir == 'UP': ty -= 4
-            elif pacman_dir == 'DOWN': ty += 4
-            elif pacman_dir == 'LEFT': tx -= 4
-            elif pacman_dir == 'RIGHT': tx += 4
-            return tx, ty
+        elif ghost['id'] == 'f2':
+            tx, ty = pac_gx, pac_gy
+            if pac_dir == 'UP': ty -= 4
+            elif pac_dir == 'DOWN': ty += 4
+            elif pac_dir == 'LEFT': tx -= 4
+            elif pac_dir == 'RIGHT': tx += 4
+            return (tx, ty)
+
+        elif ghost['id'] == 'f3':
+            pivot_x, pivot_y = pac_gx, pac_gy
+            if pac_dir == 'UP': pivot_y -= 2
+            elif pac_dir == 'DOWN': pivot_y += 2
+            elif pac_dir == 'LEFT': pivot_x -= 2
+            elif pac_dir == 'RIGHT': pivot_x += 2
             
-        if ghost_type == 'Clyde': # Covarde
-            dist = self.manhattan_distance(ghost_x, ghost_y, self.pacman['x'], self.pacman['y'])
-            if dist > 8: return pacman_grid_x, pacman_grid_y
-            return 1, GRID_HEIGHT - 2
+            blinky = next((g for g in self.ghosts if g['id'] == 'f1'), None)
+            if blinky:
+                b_gx = int(blinky['x'] // TILE_SIZE)
+                b_gy = int(blinky['y'] // TILE_SIZE)
+                
+                vec_x = pivot_x - b_gx
+                vec_y = pivot_y - b_gy
+                return (b_gx + vec_x * 2, b_gy + vec_y * 2)
+            return (pac_gx, pac_gy)
+
+        elif ghost['id'] == 'f4':
+            ghost_gx = int(ghost['x'] // TILE_SIZE)
+            ghost_gy = int(ghost['y'] // TILE_SIZE)
+            dist = math.sqrt((ghost_gx - pac_gx)**2 + (ghost_gy - pac_gy)**2)
             
-        return pacman_grid_x, pacman_grid_y # Default/Inky simplified
+            if dist > 8:
+                return (pac_gx, pac_gy)
+            else:
+                return ghost['scatter_target']
+
+        return (pac_gx, pac_gy)
 
     def update_ghosts(self):
-        current_time = time()
-        if current_time - self.mode_timer > (self.scatter_duration if self.mode=='scatter' else self.chase_duration):
-            self.mode = 'chase' if self.mode=='scatter' else 'scatter'
-            self.mode_timer = current_time
-            for ghost in self.ghosts:
-                if ghost['state']=='normal':
-                    # Inverte direção ao trocar modo
-                    op = {'UP':'DOWN','DOWN':'UP','LEFT':'RIGHT','RIGHT':'LEFT'}
-                    ghost['dir'] = op.get(ghost['dir'], ghost['dir'])
+        current_time = time.time()
+        elapsed = current_time - self.last_mode_switch
+        
+        if self.current_mode == 'scatter' and elapsed > 7:
+            self.current_mode = 'chase'
+            self.last_mode_switch = current_time
+            for g in self.ghosts:
+                if g['state'] == 'normal':
+                    g['direction'] = self.get_opposite(g['direction'])
+        elif self.current_mode == 'chase' and elapsed > 20:
+            self.current_mode = 'scatter'
+            self.last_mode_switch = current_time
+            for g in self.ghosts:
+                if g['state'] == 'normal':
+                    g['direction'] = self.get_opposite(g['direction'])
 
-        px_grid = self.to_grid(self.pacman['x'] + TILE_SIZE//2)
-        py_grid = self.to_grid(self.pacman['y'] + TILE_SIZE//2)
+        possible_directions = ['UP', 'LEFT', 'DOWN', 'RIGHT']
 
         for ghost in self.ghosts:
-            cx = ghost['x']
-            cy = ghost['y']
-            
-            # Só toma decisão de direção se estiver perfeitamente alinhado na grid
-            # Isso evita que o fantasma tente virar no meio da parede
-            if cx % TILE_SIZE == 0 and cy % TILE_SIZE == 0:
-                ghost_type = self.GHOST_NAMES[ghost['id']]['type']
+            if self.pacman['power_up_timer'] > 0:
+                ghost['state'] = 'vulnerable'
+            else:
+                ghost['state'] = 'normal'
+
+            if int(ghost['x']) % TILE_SIZE == 0 and int(ghost['y']) % TILE_SIZE == 0:
+                
+                grid_x = int(ghost['x'] // TILE_SIZE)
+                grid_y = int(ghost['y'] // TILE_SIZE)
                 
                 valid_moves = []
-                reverse = {'UP':'DOWN','DOWN':'UP','LEFT':'RIGHT','RIGHT':'LEFT'}.get(ghost['dir'])
+                opposite = self.get_opposite(ghost['direction'])
                 
-                for d in ('UP','DOWN','LEFT','RIGHT'):
-                    if d == reverse and len(valid_moves) > 0: continue # Evita voltar a menos que seja sem saída
+                for d in possible_directions:
+                    nx, ny = grid_x, grid_y
+                    if d == 'UP': ny -= 1
+                    elif d == 'DOWN': ny += 1
+                    elif d == 'LEFT': nx -= 1
+                    elif d == 'RIGHT': nx += 1
                     
-                    # Simula posição futura
-                    nx, ny = cx, cy
-                    if d=='UP': ny -= TILE_SIZE
-                    elif d=='DOWN': ny += TILE_SIZE
-                    elif d=='LEFT': nx -= TILE_SIZE
-                    elif d=='RIGHT': nx += TILE_SIZE
-                    
-                    if not self.is_collision(nx, ny, is_ghost=True):
-                        valid_moves.append(d)
+                    if not self.is_wall(nx, ny):
+                        if d != opposite:
+                            valid_moves.append(d)
+                
+                if not valid_moves:
+                    if not self.is_wall(grid_x, grid_y): 
+                        valid_moves.append(opposite)
 
                 if valid_moves:
                     if ghost['state'] == 'vulnerable':
-                        ghost['dir'] = choice(valid_moves)
+                        ghost['direction'] = random.choice(valid_moves)
                     else:
-                        # Escolhe o movimento que minimiza distância ao alvo
-                        target_x, target_y = self.get_ghost_target(ghost_type, cx, cy, px_grid, py_grid, self.pacman['direction'])
-                        best_dir = ghost['dir']
+                        target_x, target_y = self.get_target_tile(ghost)
+                        best_dir = valid_moves[0]
                         min_dist = float('inf')
                         
-                        for move in valid_moves:
-                            nx, ny = cx, cy
-                            if move=='UP': ny -= TILE_SIZE
-                            elif move=='DOWN': ny += TILE_SIZE
-                            elif move=='LEFT': nx -= TILE_SIZE
-                            elif move=='RIGHT': nx += TILE_SIZE
+                        for d in valid_moves:
+                            nx, ny = grid_x, grid_y
+                            if d == 'UP': ny -= 1
+                            elif d == 'DOWN': ny += 1
+                            elif d == 'LEFT': nx -= 1
+                            elif d == 'RIGHT': nx += 1
                             
-                            dist = abs(self.to_grid(nx) - target_x) + abs(self.to_grid(ny) - target_y)
+                            dist = (nx - target_x)**2 + (ny - target_y)**2
+                            
                             if dist < min_dist:
                                 min_dist = dist
-                                best_dir = move
-                        ghost['dir'] = best_dir
-                else:
-                    # Beco sem saída, volta
-                    ghost['dir'] = reverse if reverse else 'UP'
+                                best_dir = d
+                        
+                        ghost['direction'] = best_dir
 
-            # Aplica Movimento
-            if ghost['dir']=='UP': ghost['y'] -= GHOST_SPEED
-            elif ghost['dir']=='DOWN': ghost['y'] += GHOST_SPEED
-            elif ghost['dir']=='LEFT': ghost['x'] -= GHOST_SPEED
-            elif ghost['dir']=='RIGHT': ghost['x'] += GHOST_SPEED
+            moved, nx, ny = self.can_move(ghost['x'], ghost['y'], ghost['direction'], ghost['speed'])
+            if moved:
+                ghost['x'] = nx
+                ghost['y'] = ny
+            else:
+                ghost['direction'] = random.choice(possible_directions)
 
-            # Colisão Pacman
-            if abs(self.pacman['x'] - ghost['x']) < TILE_SIZE/2 and abs(self.pacman['y'] - ghost['y']) < TILE_SIZE/2:
-                if ghost['state']=='vulnerable':
-                    self.pacman['score'] += 200
-                    ghost['x'] = 14 * TILE_SIZE
-                    ghost['y'] = 14 * TILE_SIZE
-                    ghost['state'] = 'normal'
-                else:
-                    self.game_status = 'game_over'
+    def get_opposite(self, direction):
+        if direction == 'UP': return 'DOWN'
+        if direction == 'DOWN': return 'UP'
+        if direction == 'LEFT': return 'RIGHT'
+        if direction == 'RIGHT': return 'LEFT'
+        return 'RIGHT'
 
-    def activate_power_up(self):
-        for g in self.ghosts: g['state'] = 'vulnerable'
+    def update_pacman(self):
+        if self.pacman['next_direction'] != self.pacman['direction']:
+            center_x = self.pacman['x'] + TILE_SIZE / 2
+            center_y = self.pacman['y'] + TILE_SIZE / 2
+            grid_x = int(center_x // TILE_SIZE)
+            grid_y = int(center_y // TILE_SIZE)
+            target_center_x = grid_x * TILE_SIZE + TILE_SIZE / 2
+            target_center_y = grid_y * TILE_SIZE + TILE_SIZE / 2
+            diff_x = abs(center_x - target_center_x)
+            diff_y = abs(center_y - target_center_y)
+            threshold = self.pacman['speed']
 
-    def deactivate_power_up(self):
-        for g in self.ghosts: g['state'] = 'normal'
+            if self.pacman['next_direction'] in ['UP', 'DOWN']:
+                if diff_x <= threshold:
+                    snap_x = grid_x * TILE_SIZE
+                    is_free, _, _ = self.can_move(snap_x, self.pacman['y'], self.pacman['next_direction'], self.pacman['speed'])
+                    if is_free:
+                        self.pacman['x'] = snap_x
+                        self.pacman['direction'] = self.pacman['next_direction']
 
-    def check_win(self):
-        if self.dots_remaining <= 0: self.game_status = 'win'
+            elif self.pacman['next_direction'] in ['LEFT', 'RIGHT']:
+                if diff_y <= threshold:
+                    snap_y = grid_y * TILE_SIZE
+                    is_free, _, _ = self.can_move(self.pacman['x'], snap_y, self.pacman['next_direction'], self.pacman['speed'])
+                    if is_free:
+                        self.pacman['y'] = snap_y
+                        self.pacman['direction'] = self.pacman['next_direction']
 
-game = Game()
-game_running = False
-
-def game_loop():
-    global game_running
-    FPS = 60
-    while not game.player_connected:
-        sleep(0.1)
-    
-    with state_lock:
-        game.game_status = "running"
-    game_running = True
-    
-    while game_running:
-        start = time()
-        with state_lock:
-            if game.game_status == "running":
-                if game.client_movement_queue:
-                    game.update_pacman(game.client_movement_queue)
-                    game.client_movement_queue = None
-                game.update_ghosts()
-                game.check_win()
-            
-            if game.game_status in ('game_over', 'win', 'waiting_for_players'):
-                # Mantém o loop rodando mas sem atualizar lógica se acabou, esperando reset
-                if game.game_status != 'running':
-                    pass
+        moved, nx, ny = self.can_move(self.pacman['x'], self.pacman['y'], self.pacman['direction'], self.pacman['speed'])
         
-        elapsed = time() - start
-        if elapsed < 1.0/FPS:
-            sleep(1.0/FPS - elapsed)
-    
-    with state_lock:
-        game.reset_game()
+        if moved:
+            self.pacman['x'] = nx
+            self.pacman['y'] = ny
 
-def handle_client(conn, addr):
-    global game_running
-    buffer = ""
-    
-    print(f"Cliente conectado: {addr}")
-    
-    with state_lock:
-        if game.player_connected:
-            conn.close()
-            return
-        game.player_connected = True
-        if not game_running:
-            threading.Thread(target=game_loop, daemon=True).start()
+        center_x = self.pacman['x'] + TILE_SIZE // 2
+        center_y = self.pacman['y'] + TILE_SIZE // 2
+        grid_x = int(center_x // TILE_SIZE)
+        grid_y = int(center_y // TILE_SIZE)
 
-    try:
-        conn.settimeout(None) # Timeout controlado pelo select ou blocking normal
-        while True:
+        if 0 <= grid_y < GRID_HEIGHT and 0 <= grid_x < GRID_WIDTH:
+            tile = self.game_map[grid_y][grid_x]
+            if tile == PELLET: 
+                self.game_map[grid_y][grid_x] = 3 
+                self.pacman['score'] += 10
+            elif tile == POWER_UP: 
+                self.game_map[grid_y][grid_x] = 3
+                self.pacman['score'] += 50
+                self.pacman['power_up_timer'] = 600 
+
+        if self.pacman['power_up_timer'] > 0:
+            self.pacman['power_up_timer'] -= 1
+
+    def check_collisions(self):
+        pac_rect = pygame.Rect(self.pacman['x'], self.pacman['y'], TILE_SIZE, TILE_SIZE)
+        
+        for ghost in self.ghosts:
+            ghost_rect = pygame.Rect(ghost['x'], ghost['y'], TILE_SIZE, TILE_SIZE)
+            
+            if pac_rect.inflate(-10, -10).colliderect(ghost_rect.inflate(-10, -10)):
+                if ghost['state'] == 'vulnerable':
+                    ghost['x'] = 10 * TILE_SIZE
+                    ghost['y'] = 9 * TILE_SIZE
+                    self.pacman['score'] += 200
+                else:
+                    self.status = 'game_over'
+
+        pellets_left = sum(row.count(PELLET) + row.count(POWER_UP) for row in self.game_map)
+        if pellets_left == 0:
+            self.status = 'win'
+
+    def game_loop(self):
+        print(f"Server started on {HOST}:{PORT}")
+        while self.running:
+            start_time = time.time()
+            self.handle_clients()
+            if self.status == 'running':
+                self.update_pacman()
+                self.update_ghosts()
+                self.check_collisions()
+            elapsed = time.time() - start_time
+            sleep_time = max(0, (1.0 / FPS) - elapsed)
+            time.sleep(sleep_time)
+
+    def handle_clients(self):
+        self.server_socket.settimeout(0.001) 
+        try:
+            client, addr = self.server_socket.accept()
+            print(f"Player connected from {addr}")
+            self.clients.append(client)
+            if self.status == 'waiting_for_players' or self.status == 'game_over' or self.status == 'win':
+                self.reset_game()
+                self.status = 'running'
+        except socket.timeout:
+            pass
+        except Exception as e:
+            print(f"Error accepting: {e}")
+
+        for client in self.clients[:]:
             try:
-                data = conn.recv(4096)
-                if not data: break
-                buffer += data.decode('utf-8')
-                
-                while '\n' in buffer:
-                    msg_str, buffer = buffer.split('\n', 1)
-                    if not msg_str.strip(): continue
-                    
-                    try:
-                        msg = json.loads(msg_str)
-                    except json.JSONDecodeError:
-                        continue
-                        
-                    cmd = msg.get('command')
-                    
-                    if cmd == 'DISCONNECT':
-                        return # Sai do loop e vai pro finally
-                        
-                    if cmd == 'MOVE' and game.game_status == 'running':
-                        with state_lock:
-                            game.client_movement_queue = msg.get('direction')
-                    
-                    # Sempre responde com o estado atual
-                    with state_lock:
-                        state = game.serializer()
-                    
-                    try:
-                        # Protocolo: JSON + \n
-                        conn.sendall((json.dumps(state) + "\n").encode('utf-8'))
-                    except OSError:
-                        return
-
-            except OSError:
-                break
-    finally:
-        print(f"Cliente desconectado: {addr}")
-        with state_lock:
-            game.player_connected = False
-            game_running = False # Para o loop do jogo
-        conn.close()
-
-def start_server():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        server.bind((HOST, PORT))
-        server.listen()
-        print(f"Servidor rodando em {HOST}:{PORT}")
-        while True:
-            conn, addr = server.accept()
-            threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.close()
+                client.settimeout(0.001)
+                data = client.recv(4096)
+                if data:
+                    message = json.loads(data.decode('utf-8'))
+                    command = message.get('command')
+                    if command == 'CONNECT':
+                        client.sendall(json.dumps(self.get_state()).encode('utf-8'))
+                    elif command == 'MOVE':
+                        direction = message.get('direction')
+                        self.pacman['next_direction'] = direction
+                        client.sendall(json.dumps(self.get_state()).encode('utf-8'))
+                    elif command == 'GET_STATE':
+                        client.sendall(json.dumps(self.get_state()).encode('utf-8'))
+                    elif command == 'DISCONNECT':
+                        self.clients.remove(client)
+                        client.close()
+                        print("Player disconnected.")
+                        if not self.clients:
+                            self.status = 'waiting_for_players'
+            except socket.timeout:
+                pass
+            except (ConnectionResetError, BrokenPipeError):
+                if client in self.clients:
+                    self.clients.remove(client)
+            except json.JSONDecodeError:
+                pass
+            except Exception as e:
+                print(f"Client error: {e}")
 
 if __name__ == '__main__':
-    start_server()
+    pygame.init() 
+    server = GameServer()
+    try:
+        server.game_loop()
+    except KeyboardInterrupt:
+        print("\nServer stopping...")
+    finally:
+        server.server_socket.close()
